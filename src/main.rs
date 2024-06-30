@@ -162,7 +162,7 @@ fn create_client_connection(client_id: uuid::Uuid, stream: TcpStream, client_man
     let mut _stream = stream.try_clone().expect("clone failed...");
     let _ = thread::spawn(
         move || {
-            let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::from_str("0.0.0.0") //destination ip address
+            let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::from_str("0.0.0.0")
                 .expect("Invalid address")), 2727);
             let buffer_size = 256;
             let mut telnet = Telnet::connect_timeout(&address, buffer_size, Duration::from_secs(10))
