@@ -1,8 +1,9 @@
 use std::collections::{HashMap};
 use std::io::{Read, Write};
-use std::net::{IpAddr, TcpListener, TcpStream};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::{thread};
+use std::str::FromStr;
 use std::thread::sleep;
 use std::time::Duration;
 use uuid::Uuid;
@@ -104,7 +105,7 @@ fn main() {
 
 fn start_telnet_server() -> TcpListener {
     let local_ip_address = local_ip().unwrap();
-    println!("{}",local_ip_address);
+    println!("{}", local_ip_address);
     let address = local_ip_address.to_string() + ":9000";
     let listener = TcpListener::bind(address.clone()).unwrap();
     listener.set_nonblocking(true).expect("Cannot set non-blocking");
@@ -127,7 +128,7 @@ fn launch_client_manager(sender: Sender<ClientManagerMessage>, receiver: Receive
                                 let client_manager_sender = sender.clone();
                                 let client_id = Uuid::new_v4();
                                 let client_connection = create_client_connection(client_id, stream, client_manager_sender);
-                                println!("Client Connection created for Client ID: {}", client_id);
+                                println!("Client Connection created - Client ID: {} | Client IP Address: {}", client_id, client_connection.ip_addr);
                                 if client_id == client_connection.client_id {
                                     let _ = client_manager.clients.insert(client_id, client_connection);
                                     println!("Inserted Client ID: {} to into Client Map", client_id)
@@ -161,11 +162,12 @@ fn create_client_connection(client_id: uuid::Uuid, stream: TcpStream, client_man
     let mut _stream = stream.try_clone().expect("clone failed...");
     let _ = thread::spawn(
         move || {
-            let address = ("192.168.1.228", 23); // VintageCeleron
-            let client_id = client_id;
+            let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::from_str("0.0.0.0") //destination ip address
+                .expect("Invalid address")), 2727);
             let buffer_size = 256;
-            let mut telnet = Telnet::connect(address, buffer_size)
+            let mut telnet = Telnet::connect_timeout(&address, buffer_size, Duration::from_secs(10))
                 .expect("Couldn't connect to the server...");
+            let client_id = client_id;
             println!("Client ID: {} connected to Telnet Server", client_id);
             loop {
                 const MESSAGE_SIZE: usize = 1;
@@ -199,7 +201,7 @@ fn create_client_connection(client_id: uuid::Uuid, stream: TcpStream, client_man
                                     Action::Do => {
                                         telnet.negotiate(&Action::Will, option).unwrap();
 
-                                        let location = String::from("19.19.19.19");  // Todo Send actual IP address
+                                        let location = String::from(ip_addr.to_string());
                                         telnet.subnegotiate(TelnetOption::SNDLOC, &location.as_bytes().to_vec()).unwrap();
                                     }
                                     Action::Dont => {
@@ -265,8 +267,8 @@ fn create_client_connection(client_id: uuid::Uuid, stream: TcpStream, client_man
                                 match action {
                                     Action::Do => {
                                         telnet.negotiate(&Action::Will, option).unwrap();
-
-                                        let terminal_type = String::from("ansi-bbs"); // TODO: Send actual terminal type
+                                        // TODO: Send actual terminal type
+                                        let terminal_type = String::from("ansi-bbs");
                                         telnet.subnegotiate(TelnetOption::TTYPE, &terminal_type.as_bytes().to_vec()).unwrap();
                                     }
                                     _ => ()
@@ -286,13 +288,13 @@ fn create_client_connection(client_id: uuid::Uuid, stream: TcpStream, client_man
                     }
                     TelnetEvent::UnknownIAC(_) => {}
                     TelnetEvent::Subnegotiation(_, _) => {}
-                    TelnetEvent::TimedOut => { println!("Timedout") }
+                    TelnetEvent::TimedOut => { println!("Timed out") }
                     TelnetEvent::NoData => {}
                 }
                 sleep(Duration::from_nanos(10))
             }
             client_manager_tx.try_send(ClientManagerMessage::ConnectionClosed { client_id }).unwrap();
-            println!("Client ID: {} - Telnet Connection Closed: {}", client_id, address.0)
+            println!("Client ID: {} - Telnet Connection Closed", client_id)
         }
     );
     client_connection
