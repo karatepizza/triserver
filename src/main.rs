@@ -162,7 +162,7 @@ fn create_client_connection(client_id: uuid::Uuid, stream: TcpStream, client_man
     let mut _stream = stream.try_clone().expect("clone failed...");
     let _ = thread::spawn(
         move || {
-            let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::from_str("0.0.0.0")
+            let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::from_str("172.250.225.86")
                 .expect("Invalid address")), 2727);
             let buffer_size = 256;
             let mut telnet = Telnet::connect_timeout(&address, buffer_size, Duration::from_secs(10))
@@ -184,8 +184,9 @@ fn create_client_connection(client_id: uuid::Uuid, stream: TcpStream, client_man
                 let event = telnet.read_nonblocking().expect("Telnet Read Error");
                 match event {
                     TelnetEvent::Data(buffer) => {
-                        let response = String::from_cp437(buffer.into_vec(), &CP437_CONTROL);
-                        _stream.write_all(response.as_bytes()).expect("TCP Stream Write All Error");
+                        // let response = String::from_cp437(buffer.into_vec(), &CP437_CONTROL);
+                        // _stream.write_all(response.as_bytes()).expect("TCP Stream Write All Error");
+                        _stream.write_all(&buffer).expect("TCP Stream Write All Error");
                         _stream.flush().expect("TCP Stream Flush Error");
                     }
                     TelnetEvent::Negotiation(action, option) => {
